@@ -9,7 +9,9 @@ $$ \mu_{S_t} = \sum_{i=1}^l \mu_i S_{it} \quad \text{(Mean of State $i$)}, \quad
 
 $$ S_{it} = I[S_t=i] \quad \text{(Indicator Variable)}, \quad p_{i,j} = P[S_t=j|S_{t-1}=i] \quad \sum_{j=1}^l p_{i,j}=1 \quad \text{(Transition Probabilities)} $$
 
-The `main.ipynb` notebook provides an example of applying this to S&P 500 return data.
+The `main.ipynb` notebook provides an example of applying this to FED return data. 
+
+Check out the writeup explaining the algorithm <a href="https://drive.google.com/file/d/1nfoNjcJfUpudIiWJt5PEUaczfERx-7gk/view?usp=sharing">here</a>!
 
 In case this repository was helpful, please consider citing the main authors:
 ```
