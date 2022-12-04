@@ -2,6 +2,7 @@ import pandas as pd
 from scipy import linalg
 import numpy as np
 import math
+from tqdm import tqdm
 
 def hamFilt(x,y,S1,S2,phi0,phi1,P,S,mu):
     """
@@ -69,7 +70,7 @@ def hamFilt(x,y,S1,S2,phi0,phi1,P,S,mu):
     return(S)
 
 
-def lag_matrix(s,lag=2, dropna=True):
+def lag_matrix(s,lag, dropna=True):
     '''
     Builds a new DataFrame to facilitate regressing over all possible lagged features
     Source: https://stackoverflow.com/questions/20410312/how-to-create-a-lagged-data-structure-using-pandas-dataframe
@@ -84,9 +85,8 @@ def lag_matrix(s,lag=2, dropna=True):
         res=pd.DataFrame(new_dict,index=s.index)
 
     elif type(s) is pd.Series:
-        the_range=range(lag+1)
-        res=pd.concat([s.shift(i) for i in the_range],axis=1)
-        res.columns=['lag_%d' %i for i in the_range]
+        res=pd.concat([s.shift(i) for i in range(1,lag+1)],axis=1)
+        res.columns=['lag_%d' %i for i in range(1,lag+1)]
     else:
         print('Only works for DataFrame or Series')
         return None
@@ -135,7 +135,7 @@ def transmat_post(u00,u01,u11,u10,S,G):
 
 def beta_post(x, y, S, sig0, sig1, A0, a0, B0, b0, v0, d0, mu, phi0, phi1):
     """
-    Sample phi (slope coefs) and sigma (state variances)
+    Sample phi (slope coefs), mu (state means), and sigma (state variances)
     """
     chol_coef = x.shape[1]
     num_lags = x.shape[1]-1
@@ -236,7 +236,7 @@ def estimate(x, y, reps, num_states, sig0, sig1, p, q, d0, v0, u00, u01, u10, u1
     out2 = [] #Transition Probabilities
     out3 = [] #Beta/Variance 
 
-    for i in range(1, reps+1):    
+    for i in tqdm(range(1, reps+1)):    
         # Sample probabilities of states per timestep using Hamilton Filter
         S = hamFilt(x=x,
                     y=y,
