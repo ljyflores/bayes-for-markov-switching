@@ -204,3 +204,92 @@ def beta_post(x, y, S, sig0, sig1, A0, a0, B0, b0, v0, d0, mu, phi0, phi1):
     sigma1 = 1 / np.random.gamma(shape=T1, scale=1/D1, size=1)[0]
 
     return {'phi0': phi0, 'phi1': phi1, 'sigma0': sigma0, 'sigma1': sigma1, 'mu': mu}
+
+def preprocess_ts(y, lags):
+    y = (y-min(y))/(max(y)-min(y)) # Standardize
+    x = lag_matrix(y, lags, dropna=False) # Get lags
+    x['constant'] = 1
+
+    x = x.iloc[lags:].reset_index(drop=True)
+    y = y[lags:].reset_index(drop=True)
+    return x, y
+
+#MCMC
+def estimate(x, y, reps, num_states, sig0, sig1, p, q, d0, v0, u00, u01, u10, u11):
+    
+    ### Priors ###
+    b0 = np.zeros((x.shape[1],1)) # num_lags x 1
+    B0 = np.diag([100]*x.shape[1]) # num_lags x num_lags
+
+    a0 = np.zeros((num_states,1)) # num_states x 1
+    A0 = np.diag([100]*num_states) # num_states x num_states
+
+    phi0 = np.zeros((x.shape[1],1))
+    phi1 = np.zeros((x.shape[1],1))
+    pmat = np.array([[p,1-p],[1-q,q]])
+
+    S = np.random.binomial(1, 0.5, size=x.shape[0])
+    mu = (x.iloc[:,:-1].mean(axis=0)).values
+
+    ### Estimate ###
+    out1 = [] #States/Regimes
+    out2 = [] #Transition Probabilities
+    out3 = [] #Beta/Variance 
+
+    for i in range(1, reps+1):    
+        # Sample probabilities of states per timestep using Hamilton Filter
+        S = hamFilt(x=x,
+                    y=y,
+                    S1=sig0,
+                    S2=sig1,
+                    phi0=phi0,
+                    phi1=phi1,
+                    P=pmat,
+                    S=S,
+                    mu=mu) 
+        # Sample transition probabilities from beta distribution
+        pmat = transmat_post(u00 = u00,
+                            u01 = u01,
+                            u11 = u11,
+                            u10 = u10, 
+                            S   = S,
+                            G   = np.array([1,2]).reshape(2))
+        # Sample means (mu), variances (sigma), and coefficients (phi)
+        new_params = beta_post(x=x, 
+                            y=y, 
+                            S=S, 
+                            sig0=sig0, 
+                            sig1=sig1, 
+                            A0=A0, 
+                            a0=a0, 
+                            B0=B0, 
+                            b0=b0, 
+                            v0=v0, 
+                            d0=d0, 
+                            mu=mu, 
+                            phi0=phi0.reshape(-1),
+                            phi1=phi1.reshape(-1))
+        phi0 = new_params['phi0'].reshape(-1,1)
+        phi1 = new_params['phi1'].reshape(-1,1)
+        sig0 = new_params['sigma0']
+        sig1 = new_params['sigma1']
+        mu   = new_params['mu']
+
+        # Impose identification restriction on sigma
+        if sig0 > sig1:
+            S = 1-S
+            pmat = pmat[::-1][:,::-1]
+            phi0, phi1 = phi1, phi0
+            sig0, sig1 = sig1, sig0
+            mu = mu[::-1]
+            new_params = {'phi0':phi0, 'phi1':phi1, 'sigma0':sig0, 'sigma1':sig1, 'mu':mu}
+
+        out1.append(S)
+        out2.append(pmat)
+        out3.append(new_params)
+
+        if i>50:
+            out1 = out1[-50:]
+            out2 = out2[-50:]
+            out3 = out3[-50:]
+    return out1, out2, out3
